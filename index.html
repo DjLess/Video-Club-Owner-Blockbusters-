@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Video Club Owner</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Canvas para el motor isométrico -->
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- Capa de Interfaz de Usuario -->
+        <div id="ui-layer">
+            <div id="timer-container">
+                <div id="timer-bar"></div>
+            </div>
+            
+            <div id="dialogue-box">
+                <p id="npc-text">Esperando cliente...</p>
+            </div>
+
+            <div id="options-container" class="hidden">
+                <!-- Los DVDs se inyectan dinámicamente aquí -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts de la base de datos y la lógica de pantallas -->
+    <script src="db/db.js"></script>
+    <script src="screens/GameScreen.js"></script>
+</body>
+</html>

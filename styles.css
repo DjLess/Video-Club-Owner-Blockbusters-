@@ -1,0 +1,113 @@
+:root {
+    /* Colores predefinidos del juego */
+    --bg-color: #0b132b;      /* Azul muy oscuro (Fondo) */
+    --primary: #1c2541;       /* Azul mostrador */
+    --accent: #ffb703;        /* Amarillo videoclub */
+    --text-light: #ffffff;
+    --hint-1: #8ecaed;        /* Color para la pista de 20s */
+    --hint-2: #fb8500;        /* Color para la pista de 30s */
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none; /* Evitar selección de texto en móviles */
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-color);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#gameCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-color);
+}
+
+/* Interfaz superpuesta */
+#ui-layer {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 50%;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    pointer-events: none; /* Deja pasar los toques al canvas si no es UI */
+}
+
+#timer-container {
+    width: 100%;
+    height: 10px;
+    background-color: #333;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+#timer-bar {
+    width: 100%;
+    height: 100%;
+    background-color: var(--accent);
+    transition: width 1s linear, background-color 0.3s;
+}
+
+#dialogue-box {
+    background-color: rgba(28, 37, 65, 0.95);
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    padding: 15px;
+    color: var(--text-light);
+    font-size: 1rem;
+    line-height: 1.4;
+    flex-grow: 1;
+    margin-bottom: 10px;
+    pointer-events: auto;
+}
+
+/* Clases para revelar pistas dinámicamente */
+.hint-1, .hint-2 { transition: color 0.3s ease; }
+.show-hint-1 .hint-1 { color: var(--hint-1); font-weight: bold; }
+.show-hint-2 .hint-2 { color: var(--hint-2); font-weight: bold; text-decoration: underline; }
+
+#options-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    pointer-events: auto;
+}
+
+.dvd-option {
+    flex: 1;
+    aspect-ratio: 2/3;
+    background-color: var(--primary);
+    border: 2px solid var(--text-light);
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 5px;
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+.dvd-option:active {
+    background-color: var(--accent);
+    color: var(--bg-color);
+}
+
+.hidden { display: none !important; }
