@@ -6,38 +6,60 @@ class GameScreen {
         this.dialogueBox = document.getElementById('dialogue-box');
         this.npcText = document.getElementById('npc-text');
         this.optionsContainer = document.getElementById('options-container');
-        
+
+        // Sistema de partida y dinero
+        this.scoreMoney = 0;
+        this.gameDuration = 120; // 2 minutos de partida
+        this.gameTimerInterval = null;
+        this.isGameOver = false;
+
+        // Temporizador de diálogo individual
         this.timeLeft = 20;
         this.timerInterval = null;
         this.currentCustomer = null;
 
-        // Tamaño del mapa (12x12 para dar más profundidad)
+        // Sistema de partículas / textos flotantes (+$$$)
+        this.floatingTexts = [];
+
         this.mapSizeX = 12;
         this.mapSizeY = 12;
 
-        // Vendedor (Fijo detrás del mostrador x:5, y:4, z:0.5)
-        this.sellerPos = { x: 5, y: 4.2 };
+        // Vendedor (Detrás del mostrador x:5, y:4)
+        this.sellerPos = { x: 5, y: 4 };
 
-        // Lista de clientes activos en la tienda
         this.customers = [];
-        this.maxCustomers = 3;
+        this.minCustomers = 2;
+        this.maxCustomers = 5;
 
-        // Puntos navegables para exploración (Pasillos libres de la tienda)
-        this.waypoints = [
-            { x: 2, y: 2 }, { x: 2, y: 5 }, { x: 2, y: 8 },
-            { x: 4, y: 2 }, { x: 4, y: 8 },
-            { x: 7, y: 2 }, { x: 7, y: 6 }, { x: 7, y: 9 },
-            { x: 9, y: 3 }, { x: 9, y: 7 }
+        // Red de nodos para la navegación libre y coherente
+        this.nodes = {
+            'ENTRANCE': { x: 11, y: 11, neighbors: ['HALL_RIGHT'] },
+            'HALL_RIGHT': { x: 11, y: 7, neighbors: ['ENTRANCE', 'ARCADE_ZONE', 'HALL_TOP_RIGHT', 'FRONT_CROSSROAD'] },
+            'ARCADE_ZONE': { x: 11, y: 9, neighbors: ['HALL_RIGHT'] },
+            'HALL_TOP_RIGHT': { x: 11, y: 2, neighbors: ['HALL_RIGHT', 'TOP_BACK_CORRIDOR', 'COOLER_ZONE'] },
+            'COOLER_ZONE': { x: 9, y: 2, neighbors: ['HALL_TOP_RIGHT'] },
+            'TOP_BACK_CORRIDOR': { x: 5, y: 2, neighbors: ['HALL_TOP_RIGHT', 'HALL_LEFT'] },
+            'HALL_LEFT': { x: 2, y: 2, neighbors: ['TOP_BACK_CORRIDOR', 'AISLE_1'] },
+            'AISLE_1': { x: 2, y: 5, neighbors: ['HALL_LEFT', 'AISLE_2'] },
+            'AISLE_2': { x: 2, y: 8, neighbors: ['AISLE_1', 'FRONT_CROSSROAD'] },
+            'FRONT_CROSSROAD': { x: 5, y: 9, neighbors: ['AISLE_2', 'QUEUE_3', 'HALL_RIGHT'] },
+            // Fila de atención
+            'QUEUE_3': { x: 5, y: 8, neighbors: ['QUEUE_2', 'FRONT_CROSSROAD'] },
+            'QUEUE_2': { x: 5, y: 7, neighbors: ['QUEUE_1', 'QUEUE_3'] },
+            'QUEUE_1': { x: 5, y: 5.5, neighbors: ['QUEUE_2'] }
+        };
+
+        // Geometría estática de la tienda
+        this.staticObjects = [
+            { x: 1, y: 1, z: 0, w: 0.8, d: 3.5, h: 2.5, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            { x: 1, y: 5, z: 0, w: 0.8, d: 3.5, h: 2.5, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            { x: 3, y: 3, z: 0, w: 0.8, d: 4.5, h: 2.5, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            { x: 6, y: 1, z: 0, w: 4, d: 0.8, h: 3.0, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            { x: 10, y: 3, z: 0, w: 1.2, d: 2.5, h: 3, type: 'block', top: "#a5d5f2", left: "#8ecaed", right: "#63a4c4" },
+            { x: 10, y: 7, z: 0, w: 1.2, d: 1.5, h: 2.8, type: 'block', top: "#7209b7", left: "#560bad", right: "#3a0ca3" },
+            { x: 4, y: 4.5, z: 0, w: 2.5, d: 0.8, h: 1.5, type: 'block', top: "#fc9f38", left: "#fb8500", right: "#c26600" }
         ];
 
-        // Puntos de la fila frente al mostrador (x:5, y:5)
-        this.queuePositions = [
-            { x: 5, y: 6.2 }, // Atendiéndose
-            { x: 5, y: 7.5 }, // 1° en fila
-            { x: 5, y: 8.8 }  // 2° en fila
-        ];
-
-        // Offset y escalado isometrico
         this.offsetX = 0;
         this.offsetY = 0;
         this.tileSize = 40;
@@ -45,22 +67,88 @@ class GameScreen {
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
 
+        this.setupUI();
+
         this.animate = this.animate.bind(this);
         requestAnimationFrame(this.animate);
 
-        // Generar clientes iniciales
-        this.initCustomerPool();
+        this.startGameSession();
+    }
+
+    setupUI() {
+        // Crear elemento para el marcador de dinero y tiempo global
+        this.hudContainer = document.createElement('div');
+        this.hudContainer.id = 'game-hud';
+        this.hudContainer.style.position = 'absolute';
+        this.hudContainer.style.top = '15px';
+        this.hudContainer.style.right = '20px';
+        this.hudContainer.style.display = 'flex';
+        this.hudContainer.style.gap = '20px';
+        this.hudContainer.style.fontSize = '20px';
+        this.hudContainer.style.fontWeight = 'bold';
+        this.hudContainer.style.color = '#fff';
+        this.hudContainer.style.backgroundColor = 'rgba(11, 19, 43, 0.85)';
+        this.hudContainer.style.padding = '10px 20px';
+        this.hudContainer.style.borderRadius = '8px';
+        this.hudContainer.style.border = '2px solid #ffb703';
+        this.hudContainer.style.zIndex = '100';
+
+        this.hudContainer.innerHTML = `
+            <div>💰 <span id="money-display" style="color: #4ef037;">$0</span></div>
+            <div>⏱️ <span id="global-timer-display" style="color: #ffc940;">02:00</span></div>
+        `;
+
+        document.body.appendChild(this.hudContainer);
+        this.moneyDisplay = document.getElementById('money-display');
+        this.globalTimerDisplay = document.getElementById('global-timer-display');
+    }
+
+    startGameSession() {
+        this.scoreMoney = 0;
+        this.gameDuration = 120;
+        this.isGameOver = false;
+        this.moneyDisplay.innerText = `$${this.scoreMoney}`;
+
+        // Iniciar al menos el aforo mínimo
+        for (let i = 0; i < this.minCustomers; i++) {
+            setTimeout(() => this.spawnCustomer(), i * 1500);
+        }
+
+        // Bucle de flujo continuo de nuevos clientes
+        this.scheduleNextCustomerSpawn();
+
+        // Cronómetro global
+        clearInterval(this.gameTimerInterval);
+        this.gameTimerInterval = setInterval(() => {
+            this.gameDuration--;
+            const mins = String(Math.floor(this.gameDuration / 60)).padStart(2, '0');
+            const secs = String(this.gameDuration % 60).padStart(2, '0');
+            this.globalTimerDisplay.innerText = `${mins}:${secs}`;
+
+            if (this.gameDuration <= 0) {
+                this.endGameSession();
+            }
+        }, 1000);
+    }
+
+    scheduleNextCustomerSpawn() {
+        if (this.isGameOver) return;
+
+        const nextSpawnTime = Math.random() * 4000 + 3000; // Cada 3 a 7 segundos
+        setTimeout(() => {
+            if (this.customers.length < this.maxCustomers) {
+                this.spawnCustomer();
+            }
+            this.scheduleNextCustomerSpawn();
+        }, nextSpawnTime);
     }
 
     resizeCanvas() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
 
-        // Desplazamiento ajustado para dar más aire vertical sin tapar botones
         this.offsetX = this.canvas.width / 2;
-        this.offsetY = this.canvas.height * 0.18; // Elevado para dar espacio vertical
-        
-        // Ajuste adaptativo de tamaño de tile
+        this.offsetY = this.canvas.height * 0.15;
         this.tileSize = Math.min(this.canvas.width / 16, this.canvas.height / 18);
     }
 
@@ -70,7 +158,8 @@ class GameScreen {
         return { x: this.offsetX + isoX, y: this.offsetY + isoY };
     }
 
-    drawBlock(x, y, z, w, d, h, colorTop, colorLeft, colorRight) {
+    drawBlock(obj) {
+        const { x, y, z, w, d, h, top, left, right } = obj;
         const pTop0 = this.toIso(x, y, z + h);
         const pTop1 = this.toIso(x + w, y, z + h);
         const pTop2 = this.toIso(x + w, y + d, z + h);
@@ -83,22 +172,19 @@ class GameScreen {
         this.ctx.lineWidth = 1;
         this.ctx.strokeStyle = "#0b132b";
 
-        // Cara superior
-        this.ctx.fillStyle = colorTop;
+        this.ctx.fillStyle = top;
         this.ctx.beginPath();
         this.ctx.moveTo(pTop0.x, pTop0.y); this.ctx.lineTo(pTop1.x, pTop1.y);
         this.ctx.lineTo(pTop2.x, pTop2.y); this.ctx.lineTo(pTop3.x, pTop3.y);
         this.ctx.closePath(); this.ctx.fill(); this.ctx.stroke();
 
-        // Cara izquierda
-        this.ctx.fillStyle = colorLeft;
+        this.ctx.fillStyle = left;
         this.ctx.beginPath();
         this.ctx.moveTo(pTop3.x, pTop3.y); this.ctx.lineTo(pTop2.x, pTop2.y);
         this.ctx.lineTo(pBot2.x, pBot2.y); this.ctx.lineTo(pBot3.x, pBot3.y);
         this.ctx.closePath(); this.ctx.fill(); this.ctx.stroke();
 
-        // Cara derecha
-        this.ctx.fillStyle = colorRight;
+        this.ctx.fillStyle = right;
         this.ctx.beginPath();
         this.ctx.moveTo(pTop1.x, pTop1.y); this.ctx.lineTo(pTop2.x, pTop2.y);
         this.ctx.lineTo(pBot2.x, pBot2.y); this.ctx.lineTo(pBot1.x, pBot1.y);
@@ -113,7 +199,6 @@ class GameScreen {
                 const p3 = this.toIso(i + 1, j + 1);
                 const p4 = this.toIso(i, j + 1);
 
-                // Alfombra de entrada en la zona x:10..11, y:10..11
                 if (i >= 10 && j >= 10) {
                     this.ctx.fillStyle = "#e63946";
                 } else {
@@ -131,13 +216,11 @@ class GameScreen {
     drawSphere(x, y, z, baseColor, highlightColor) {
         const pixel = this.toIso(x, y, z);
         
-        // Sombra proyectada
         this.ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
         this.ctx.beginPath();
         this.ctx.ellipse(pixel.x, pixel.y + this.tileSize * 0.2, this.tileSize * 0.35, this.tileSize * 0.18, 0, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Esfera principal
         this.ctx.beginPath();
         this.ctx.arc(pixel.x, pixel.y, this.tileSize / 1.8, 0, Math.PI * 2);
         this.ctx.fillStyle = baseColor;
@@ -146,11 +229,43 @@ class GameScreen {
         this.ctx.strokeStyle = "#0b132b";
         this.ctx.stroke();
 
-        // Reflejo de brillo
         this.ctx.beginPath();
         this.ctx.arc(pixel.x - this.tileSize * 0.15, pixel.y - this.tileSize * 0.15, this.tileSize / 4, 0, Math.PI * 2);
         this.ctx.fillStyle = highlightColor;
         this.ctx.fill();
+    }
+
+    addFloatingText(text, x, y, z, color) {
+        this.floatingTexts.push({
+            text: text,
+            x: x,
+            y: y,
+            z: z,
+            color: color,
+            alpha: 1.0,
+            offsetY: 0
+        });
+    }
+
+    renderFloatingTexts() {
+        this.floatingTexts.forEach((ft, index) => {
+            const pixel = this.toIso(ft.x, ft.y, ft.z);
+            this.ctx.save();
+            this.ctx.font = 'bold 22px Arial';
+            this.ctx.fillStyle = ft.color;
+            this.ctx.globalAlpha = ft.alpha;
+            this.ctx.shadowColor = 'black';
+            this.ctx.shadowBlur = 4;
+            this.ctx.fillText(ft.text, pixel.x - 20, pixel.y - 20 - ft.offsetY);
+            this.ctx.restore();
+
+            ft.offsetY += 1.2;
+            ft.alpha -= 0.02;
+
+            if (ft.alpha <= 0) {
+                this.floatingTexts.splice(index, 1);
+            }
+        });
     }
 
     renderScene() {
@@ -159,112 +274,148 @@ class GameScreen {
 
         this.drawFloor();
 
-        // Estanterías lado Izquierdo (Amarillo/Accent)
-        this.drawBlock(1, 1, 0, 0.8, 3.5, 2.5, "#ffc940", "#ffb703", "#cc9202");
-        this.drawBlock(1, 5, 0, 0.8, 3.5, 2.5, "#ffc940", "#ffb703", "#cc9202");
-        
-        // Estanterías Centrales (Pasillos)
-        this.drawBlock(3, 3, 0, 0.8, 4.5, 2.5, "#ffc940", "#ffb703", "#cc9202");
+        const renderList = [];
 
-        // Estanterías Fondo / Pared
-        this.drawBlock(6, 1, 0, 4, 0.8, 3.0, "#ffc940", "#ffb703", "#cc9202");
-
-        // Heladera / Vitrina de bebidas (Azul claro)
-        this.drawBlock(10, 3, 0, 1.2, 2.5, 3, "#a5d5f2", "#8ecaed", "#63a4c4");
-
-        // Arcades / Máquina de snacks (Violeta)
-        this.drawBlock(10, 7, 0, 1.2, 1.5, 2.8, "#7209b7", "#560bad", "#3a0ca3");
-
-        // Mostrador Principal L
-        this.drawBlock(4, 5, 0, 2.5, 1, 1.5, "#fc9f38", "#fb8500", "#c26600");
-
-        // Dibujar al VENDEDOR (Esfera Naranja detrás del mostrador)
-        this.drawSphere(this.sellerPos.x, this.sellerPos.y, 0.5, "#ffb703", "rgba(255, 255, 255, 0.7)");
-
-        // Dibujar a los Clientes (Ordenados por profundidad ISO y=x+y)
-        const sortedCustomers = [...this.customers].sort((a, b) => (a.pos.x + a.pos.y) - (b.pos.x + b.pos.y));
-        sortedCustomers.forEach(customer => {
-            this.drawSphere(customer.pos.x, customer.pos.y, 0.5, customer.color, "rgba(255, 255, 255, 0.6)");
+        this.staticObjects.forEach(obj => {
+            renderList.push({
+                depth: obj.x + obj.y + (obj.w + obj.d) / 2,
+                render: () => this.drawBlock(obj)
+            });
         });
-    }
 
-    initCustomerPool() {
-        for (let i = 0; i < this.maxCustomers; i++) {
-            setTimeout(() => {
-                this.spawnCustomer();
-            }, i * 2500);
-        }
+        renderList.push({
+            depth: this.sellerPos.x + this.sellerPos.y,
+            render: () => this.drawSphere(this.sellerPos.x, this.sellerPos.y, 0.5, "#ffb703", "rgba(255, 255, 255, 0.7)")
+        });
+
+        this.customers.forEach(c => {
+            renderList.push({
+                depth: c.pos.x + c.pos.y,
+                render: () => this.drawSphere(c.pos.x, c.pos.y, 0.5, c.color, "rgba(255, 255, 255, 0.6)")
+            });
+        });
+
+        renderList.sort((a, b) => a.depth - b.depth);
+        renderList.forEach(item => item.render());
+
+        this.renderFloatingTexts();
     }
 
     spawnCustomer() {
+        if (typeof DB === 'undefined' || !DB.customers || this.isGameOver) return;
+
         const randomData = DB.customers[Math.floor(Math.random() * DB.customers.length)];
         const colors = ["#ffffff", "#e0e1dd", "#48cae4", "#90e0ef", "#f72585"];
         
         const newCustomer = {
             id: Math.random(),
             data: randomData,
-            pos: { x: 11, y: 11 }, // Entrada
-            target: this.getRandomWaypoint(),
-            state: 'BROWSING', // BROWSING, QUEUING, TALKING, LEAVING
-            browseCount: Math.floor(Math.random() * 2) + 1, // Pasillos a visitar antes de comprar
+            currentNodeKey: 'ENTRANCE',
+            path: [],
+            pos: { x: this.nodes['ENTRANCE'].x, y: this.nodes['ENTRANCE'].y },
+            state: 'BROWSING',
+            browseCount: Math.floor(Math.random() * 3) + 2, // Entre 2 y 4 paradas aleatorias
             color: colors[Math.floor(Math.random() * colors.length)]
         };
 
+        this.setRandomBrowseStep(newCustomer);
         this.customers.push(newCustomer);
     }
 
-    getRandomWaypoint() {
-        return { ...this.waypoints[Math.floor(Math.random() * this.waypoints.length)] };
-    }
-
-    updateCustomers() {
-        const speed = 0.05;
-
-        this.customers.forEach((c) => {
-            // Movimiento hacia su target
-            const dx = c.target.x - c.pos.x;
-            const dy = c.target.y - c.pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist > 0.08) {
-                c.pos.x += (dx / dist) * speed;
-                c.pos.y += (dy / dist) * speed;
-            } else {
-                c.pos.x = c.target.x;
-                c.pos.y = c.target.y;
-                this.handleCustomerArrival(c);
-            }
-        });
-
-        // Actualizar posiciones de la fila
-        this.updateQueuePositions();
-    }
-
-    handleCustomerArrival(c) {
-        if (c.state === 'BROWSING') {
-            c.browseCount--;
-            if (c.browseCount > 0) {
-                c.target = this.getRandomWaypoint();
-            } else {
-                c.state = 'QUEUING';
-            }
-        } else if (c.state === 'LEAVING') {
-            // Eliminar cliente cuando llega a la salida y crear uno nuevo
-            this.customers = this.customers.filter(item => item.id !== c.id);
-            setTimeout(() => this.spawnCustomer(), 2000);
+    // Elige un vecino completamente al azar de la red de nodos
+    setRandomBrowseStep(customer) {
+        const currentNode = this.nodes[customer.currentNodeKey];
+        const randomNeighbor = currentNode.neighbors[Math.floor(Math.random() * currentNode.neighbors.length)];
+        
+        // Evitar que entren a la zona de fila durante la exploración libre
+        if (['QUEUE_1', 'QUEUE_2', 'QUEUE_3'].includes(randomNeighbor)) {
+            customer.path = [customer.currentNodeKey];
+        } else {
+            customer.path = [randomNeighbor];
         }
     }
 
-    updateQueuePositions() {
-        // Filtrar clientes esperando o conversando
-        const queue = this.customers.filter(c => c.state === 'QUEUING' || c.state === 'TALKING');
+    findPath(startKey, targetKey) {
+        let queue = [[startKey]];
+        let visited = new Set([startKey]);
 
-        queue.forEach((c, index) => {
-            const targetPos = this.queuePositions[Math.min(index, this.queuePositions.length - 1)];
-            c.target = targetPos;
+        while (queue.length > 0) {
+            let path = queue.shift();
+            let node = path[path.length - 1];
 
-            // Si es el primero en la fila y no ha empezado la charla
-            if (index === 0 && c.state === 'QUEUING' && c.pos.x === targetPos.x && c.pos.y === targetPos.y) {
+            if (node === targetKey) return path.slice(1);
+
+            for (let neighbor of this.nodes[node].neighbors) {
+                if (!visited.has(neighbor)) {
+                    visited.add(neighbor);
+                    queue.push([...path, neighbor]);
+                }
+            }
+        }
+        return [];
+    }
+
+    updateCustomers() {
+        const speed = 0.045;
+
+        this.customers.forEach(c => {
+            if (c.path.length > 0) {
+                const nextNodeKey = c.path[0];
+                const targetPos = this.nodes[nextNodeKey];
+
+                const dx = targetPos.x - c.pos.x;
+                const dy = targetPos.y - c.pos.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > 0.08) {
+                    c.pos.x += (dx / dist) * speed;
+                    c.pos.y += (dy / dist) * speed;
+                } else {
+                    c.pos.x = targetPos.x;
+                    c.pos.y = targetPos.y;
+                    c.currentNodeKey = nextNodeKey;
+                    c.path.shift();
+
+                    if (c.path.length === 0) {
+                        this.handleNodeReached(c);
+                    }
+                }
+            }
+        });
+
+        this.manageQueueLogic();
+    }
+
+    handleNodeReached(c) {
+        if (c.state === 'BROWSING') {
+            c.browseCount--;
+            if (c.browseCount > 0) {
+                this.setRandomBrowseStep(c);
+            } else {
+                c.state = 'QUEUING';
+                c.path = this.findPath(c.currentNodeKey, 'FRONT_CROSSROAD');
+            }
+        } else if (c.state === 'LEAVING') {
+            this.customers = this.customers.filter(item => item.id !== c.id);
+            // Garantizar aforo mínimo si bajamos de minCustomers
+            if (this.customers.length < this.minCustomers && !this.isGameOver) {
+                setTimeout(() => this.spawnCustomer(), 1000);
+            }
+        }
+    }
+
+    manageQueueLogic() {
+        const queueCustomers = this.customers.filter(c => c.state === 'QUEUING' || c.state === 'TALKING');
+        const queueSpots = ['QUEUE_1', 'QUEUE_2', 'QUEUE_3'];
+
+        queueCustomers.forEach((c, index) => {
+            const targetSpot = queueSpots[Math.min(index, queueSpots.length - 1)];
+
+            if (c.path.length === 0 && c.currentNodeKey !== targetSpot && c.state === 'QUEUING') {
+                c.path = this.findPath(c.currentNodeKey, targetSpot);
+            }
+
+            if (index === 0 && c.currentNodeKey === 'QUEUE_1' && c.state === 'QUEUING' && c.path.length === 0 && !this.isGameOver) {
                 c.state = 'TALKING';
                 this.startInteraction(c);
             }
@@ -341,21 +492,40 @@ class GameScreen {
 
     endInteraction(success) {
         this.optionsContainer.classList.add('hidden');
+
         if (success) {
+            // Recompensa calculada según rapidez (Máximo $200, Mínimo $50)
+            const earned = 50 + (this.timeLeft * 7.5);
+            this.scoreMoney += Math.round(earned);
+            this.moneyDisplay.innerText = `$${this.scoreMoney}`;
+
+            // Texto flotante de dinero en verde
+            this.addFloatingText(`+$${Math.round(earned)}`, this.currentCustomer.pos.x, this.currentCustomer.pos.y, 1.2, '#4ef037');
             this.npcText.innerHTML = "¡Exacto! Esto es justo lo que buscaba. ¡Gracias!";
         } else {
+            // Texto flotante de fallo en rojo
+            this.addFloatingText(`¡Sin Venta!`, this.currentCustomer.pos.x, this.currentCustomer.pos.y, 1.2, '#ff3333');
             this.npcText.innerHTML = "Mmm... no estoy seguro de que esto sea lo que pedí. Me voy a otro videoclub.";
-        }
-
-        if (this.currentCustomer) {
-            this.currentCustomer.state = 'LEAVING';
-            this.currentCustomer.target = { x: 11, y: 11 }; // Salida de la tienda
         }
 
         setTimeout(() => {
             this.dialogueBox.classList.add('hidden');
-            this.currentCustomer = null;
-        }, 2500);
+            if (this.currentCustomer) {
+                this.currentCustomer.state = 'LEAVING';
+                this.currentCustomer.path = this.findPath(this.currentCustomer.currentNodeKey, 'ENTRANCE');
+                this.currentCustomer = null;
+            }
+        }, 2000);
+    }
+
+    endGameSession() {
+        this.isGameOver = true;
+        clearInterval(this.gameTimerInterval);
+        clearInterval(this.timerInterval);
+
+        this.dialogueBox.classList.remove('hidden');
+        this.optionsContainer.classList.add('hidden');
+        this.npcText.innerHTML = `🏁 <strong>¡TIEMPO CUMPLIDO!</strong><br>La jornada ha terminado. Recaudaste un total de: <span style="color:#4ef037; font-size:24px;">$${this.scoreMoney}</span>.`;
     }
 }
 
