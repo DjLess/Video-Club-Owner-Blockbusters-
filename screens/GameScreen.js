@@ -47,7 +47,7 @@ class GameScreen {
             { id: 'counter', x: 3.5, y: 4.2, z: 0, w: 2.2, d: 0.8, h: 1.1, top: "#fc9f38", left: "#fb8500", right: "#c26600" }
         ];
 
-        // Red de nodos en los pasillos libres
+        // Red de nodos conectada para navegación
         this.nodes = {
             'ENTRANCE': { x: 11, y: 11, neighbors: ['HALL_RIGHT'] },
             'HALL_RIGHT': { x: 11, y: 5.5, neighbors: ['ENTRANCE', 'SHELF_ARCADE', 'HALL_TOP_RIGHT', 'FRONT_CROSSROAD'] },
@@ -61,12 +61,10 @@ class GameScreen {
             'SHELF_LEFT_1': { x: 2.2, y: 2.8, neighbors: ['PASSED_LEFT_TOP'], isShelf: true },
             'PASSED_LEFT_MID': { x: 2.5, y: 7.0, neighbors: ['PASSED_LEFT_TOP', 'SHELF_LEFT_2', 'FRONT_CROSSROAD'] },
             'SHELF_LEFT_2': { x: 2.2, y: 6.5, neighbors: ['PASSED_LEFT_MID'], isShelf: true },
-            'FRONT_CROSSROAD': { x: 5.0, y: 9.0, neighbors: ['PASSED_LEFT_MID', 'HALL_RIGHT', 'QUEUE_3'] },
+            'FRONT_CROSSROAD': { x: 5.0, y: 9.0, neighbors: ['PASSED_LEFT_MID', 'HALL_RIGHT', 'QUEUE_1'] },
             
-            // Fila de atención
-            'QUEUE_3': { x: 4.5, y: 7.5, neighbors: ['QUEUE_2', 'FRONT_CROSSROAD'] },
-            'QUEUE_2': { x: 4.5, y: 6.2, neighbors: ['QUEUE_1', 'QUEUE_3'] },
-            'QUEUE_1': { x: 4.5, y: 5.2, neighbors: ['QUEUE_2'] }
+            // Punto de atención al frente del mostrador
+            'QUEUE_1': { x: 4.5, y: 5.2, neighbors: ['FRONT_CROSSROAD'] }
         };
 
         this.offsetX = 0;
@@ -268,12 +266,12 @@ class GameScreen {
         
         this.ctx.save();
         
-        // Creamos una máscara de recorte (clip) que tapa el 40% inferior del dueño justo en el borde superior del mostrador
+        // Máscara de recorte (clip) que tapa el 40% inferior del dueño justo en la barra superior del mostrador
         this.ctx.beginPath();
         this.ctx.rect(0, 0, this.canvas.width, counterTopPoint.y);
         this.ctx.clip();
 
-        // Renderizamos la esfera del dueño (mostrando sólo el 60% superior)
+        // Renderizamos la esfera del dueño (60% visible)
         this.drawSphere(this.sellerPos.x, this.sellerPos.y, this.sellerPos.z, "#ff7b00", "rgba(255, 255, 255, 0.8)");
         
         this.ctx.restore();
@@ -320,20 +318,30 @@ class GameScreen {
 
         const renderList = [];
 
-        // Muebles (excepto el mostrador que se gestiona de forma especial con el dueño)
+        // Detalle 1: Renderizado preciso por profundidad isométrica (X + Y + Z)
         this.staticObjects.forEach(obj => {
-            const frontDepth = (obj.x + obj.w) + (obj.y + obj.d);
-            renderList.push({
-                depth: frontDepth,
-                render: () => this.drawBlock(obj)
-            });
+            if (obj.id !== 'counter') {
+                const depth = (obj.x + obj.w / 2) + (obj.y + obj.d / 2);
+                renderList.push({
+                    depth: depth,
+                    render: () => this.drawBlock(obj)
+                });
+            }
         });
 
-        // Renderizar dueño (atrás del mostrador con el 60% visible)
+        // Vendedor
         const sellerDepth = this.sellerPos.x + this.sellerPos.y;
         renderList.push({
             depth: sellerDepth,
             render: () => this.drawOwnerBehindCounter()
+        });
+
+        // Mostrador
+        const counter = this.staticObjects.find(o => o.id === 'counter');
+        const counterDepth = (counter.x + counter.w / 2) + (counter.y + counter.d / 2);
+        renderList.push({
+            depth: counterDepth,
+            render: () => this.drawBlock(counter)
         });
 
         // NPC Clientes
@@ -345,7 +353,7 @@ class GameScreen {
             });
         });
 
-        // Ordenamiento por profundidad isométrica
+        // Ordenamiento por profundidad
         renderList.sort((a, b) => a.depth - b.depth);
 
         renderList.forEach(item => item.render());
@@ -367,10 +375,11 @@ class GameScreen {
             id: Math.random(),
             data: randomData,
             currentNodeKey: 'ENTRANCE',
+            targetPos: null,
             path: [],
             pos: { x: this.nodes['ENTRANCE'].x, y: this.nodes['ENTRANCE'].y },
             state: 'BROWSING',
-            browseCount: Math.floor(Math.random() * 3) + 2,
+            browseCount: Math.floor(Math.random() * 4) + 3,
             pauseTimer: 0,
             color: colors[Math.floor(Math.random() * colors.length)],
             hasDVD: false
@@ -380,18 +389,17 @@ class GameScreen {
         this.customers.push(newCustomer);
     }
 
+    // Detalle 2: Exploración profunda de todos los rincones de la tienda
     setRandomBrowseStep(customer) {
-        const currentNode = this.nodes[customer.currentNodeKey];
-        const randomNeighbor = currentNode.neighbors[Math.floor(Math.random() * currentNode.neighbors.length)];
+        const nodeKeys = Object.keys(this.nodes).filter(k => k !== 'ENTRANCE' && k !== 'QUEUE_1');
+        const randomKey = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
         
-        if (['QUEUE_1', 'QUEUE_2', 'QUEUE_3'].includes(randomNeighbor)) {
-            customer.path = [customer.currentNodeKey];
-        } else {
-            customer.path = [randomNeighbor];
-        }
+        customer.path = this.findPath(customer.currentNodeKey, randomKey);
     }
 
     findPath(startKey, targetKey) {
+        if (startKey === targetKey) return [];
+
         let queue = [[startKey]];
         let visited = new Set([startKey]);
 
@@ -420,25 +428,34 @@ class GameScreen {
                 return;
             }
 
-            if (c.path.length > 0) {
-                const nextNodeKey = c.path[0];
-                const targetPos = this.nodes[nextNodeKey];
+            // Movimiento basado en targetPos o ruta de nodos
+            let destination = c.targetPos;
 
-                const dx = targetPos.x - c.pos.x;
-                const dy = targetPos.y - c.pos.y;
+            if (!destination && c.path.length > 0) {
+                const nextNodeKey = c.path[0];
+                destination = this.nodes[nextNodeKey];
+            }
+
+            if (destination) {
+                const dx = destination.x - c.pos.x;
+                const dy = destination.y - c.pos.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
                 if (dist > 0.08) {
                     c.pos.x += (dx / dist) * speed;
                     c.pos.y += (dy / dist) * speed;
                 } else {
-                    c.pos.x = targetPos.x;
-                    c.pos.y = targetPos.y;
-                    c.currentNodeKey = nextNodeKey;
-                    c.path.shift();
+                    c.pos.x = destination.x;
+                    c.pos.y = destination.y;
 
-                    if (c.path.length === 0) {
-                        this.handleNodeReached(c);
+                    if (c.targetPos) {
+                        c.targetPos = null;
+                    } else {
+                        c.currentNodeKey = c.path[0];
+                        c.path.shift();
+                        if (c.path.length === 0) {
+                            this.handleNodeReached(c);
+                        }
                     }
                 }
             }
@@ -470,18 +487,26 @@ class GameScreen {
         }
     }
 
+    // Detalle 3: Fila dinámica que ubica al 4to, 5to o N cliente exactamente detrás del anterior
     manageQueueLogic() {
         const queueCustomers = this.customers.filter(c => c.state === 'QUEUING' || c.state === 'TALKING');
-        const queueSpots = ['QUEUE_1', 'QUEUE_2', 'QUEUE_3'];
+        const queueBase = this.nodes['QUEUE_1'];
+        const spacingY = 1.0;
 
         queueCustomers.forEach((c, index) => {
-            const targetSpot = queueSpots[Math.min(index, queueSpots.length - 1)];
+            const queueTarget = {
+                x: queueBase.x,
+                y: queueBase.y + (index * spacingY)
+            };
 
-            if (c.path.length === 0 && c.currentNodeKey !== targetSpot && c.state === 'QUEUING') {
-                c.path = this.findPath(c.currentNodeKey, targetSpot);
+            if (c.path.length === 0 && c.state === 'QUEUING') {
+                const distToSpot = Math.hypot(queueTarget.x - c.pos.x, queueTarget.y - c.pos.y);
+                if (distToSpot > 0.1) {
+                    c.targetPos = queueTarget;
+                }
             }
 
-            if (index === 0 && c.currentNodeKey === 'QUEUE_1' && c.state === 'QUEUING' && c.path.length === 0 && !this.isGameOver) {
+            if (index === 0 && c.state === 'QUEUING' && Math.hypot(queueBase.x - c.pos.x, queueBase.y - c.pos.y) < 0.15 && !this.isGameOver) {
                 c.state = 'TALKING';
                 this.startInteraction(c);
             }
@@ -556,6 +581,7 @@ class GameScreen {
         });
     }
 
+    // Detalle 4: Desplazamiento lateral antes de encaminarse a la salida para evitar atravesar la fila
     endInteraction(success) {
         this.optionsContainer.classList.add('hidden');
 
@@ -579,7 +605,8 @@ class GameScreen {
             this.dialogueBox.classList.add('hidden');
             if (this.currentCustomer) {
                 this.currentCustomer.state = 'LEAVING';
-                this.currentCustomer.path = this.findPath(this.currentCustomer.currentNodeKey, 'ENTRANCE');
+                this.currentCustomer.currentNodeKey = 'FRONT_CROSSROAD';
+                this.currentCustomer.path = this.findPath('FRONT_CROSSROAD', 'ENTRANCE');
                 this.currentCustomer = null;
             }
         }, 2000);
