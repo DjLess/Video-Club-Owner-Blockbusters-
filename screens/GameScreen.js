@@ -9,7 +9,7 @@ class GameScreen {
 
         // Sistema de partida y dinero
         this.scoreMoney = 0;
-        this.gameDuration = 120; // 2 minutos de partida
+        this.gameDuration = 120;
         this.gameTimerInterval = null;
         this.isGameOver = false;
 
@@ -18,46 +18,55 @@ class GameScreen {
         this.timerInterval = null;
         this.currentCustomer = null;
 
-        // Sistema de partículas / textos flotantes (+$$$)
+        // Textos flotantes (+$$$)
         this.floatingTexts = [];
 
         this.mapSizeX = 12;
         this.mapSizeY = 12;
 
-        // Vendedor (Detrás del mostrador x:5, y:4)
-        this.sellerPos = { x: 5, y: 4 };
+        // Vendedor (Detrás del mostrador x:5, y:3.8, z:0.6)
+        this.sellerPos = { x: 5, y: 3.8, z: 0.6 };
 
         this.customers = [];
         this.minCustomers = 2;
         this.maxCustomers = 5;
 
-        // Red de nodos para la navegación libre y coherente
+        // Red ampliada de nodos para navegación realista
         this.nodes = {
             'ENTRANCE': { x: 11, y: 11, neighbors: ['HALL_RIGHT'] },
-            'HALL_RIGHT': { x: 11, y: 7, neighbors: ['ENTRANCE', 'ARCADE_ZONE', 'HALL_TOP_RIGHT', 'FRONT_CROSSROAD'] },
-            'ARCADE_ZONE': { x: 11, y: 9, neighbors: ['HALL_RIGHT'] },
-            'HALL_TOP_RIGHT': { x: 11, y: 2, neighbors: ['HALL_RIGHT', 'TOP_BACK_CORRIDOR', 'COOLER_ZONE'] },
-            'COOLER_ZONE': { x: 9, y: 2, neighbors: ['HALL_TOP_RIGHT'] },
-            'TOP_BACK_CORRIDOR': { x: 5, y: 2, neighbors: ['HALL_TOP_RIGHT', 'HALL_LEFT'] },
-            'HALL_LEFT': { x: 2, y: 2, neighbors: ['TOP_BACK_CORRIDOR', 'AISLE_1'] },
-            'AISLE_1': { x: 2, y: 5, neighbors: ['HALL_LEFT', 'AISLE_2'] },
-            'AISLE_2': { x: 2, y: 8, neighbors: ['AISLE_1', 'FRONT_CROSSROAD'] },
-            'FRONT_CROSSROAD': { x: 5, y: 9, neighbors: ['AISLE_2', 'QUEUE_3', 'HALL_RIGHT'] },
-            // Fila de atención
-            'QUEUE_3': { x: 5, y: 8, neighbors: ['QUEUE_2', 'FRONT_CROSSROAD'] },
-            'QUEUE_2': { x: 5, y: 7, neighbors: ['QUEUE_1', 'QUEUE_3'] },
-            'QUEUE_1': { x: 5, y: 5.5, neighbors: ['QUEUE_2'] }
+            'HALL_RIGHT': { x: 11, y: 7, neighbors: ['ENTRANCE', 'SHELF_ARCADE', 'HALL_TOP_RIGHT', 'FRONT_CROSSROAD'] },
+            'SHELF_ARCADE': { x: 11, y: 9, neighbors: ['HALL_RIGHT'], isShelf: true },
+            'HALL_TOP_RIGHT': { x: 11, y: 2, neighbors: ['HALL_RIGHT', 'TOP_BACK_CORRIDOR', 'SHELF_COOLER'] },
+            'SHELF_COOLER': { x: 9.2, y: 2, neighbors: ['HALL_TOP_RIGHT'], isShelf: true },
+            'TOP_BACK_CORRIDOR': { x: 6, y: 2, neighbors: ['HALL_TOP_RIGHT', 'SHELF_BACK_WALL', 'HALL_LEFT'] },
+            'SHELF_BACK_WALL': { x: 7.5, y: 2, neighbors: ['TOP_BACK_CORRIDOR'], isShelf: true },
+            'HALL_LEFT': { x: 2.2, y: 2, neighbors: ['TOP_BACK_CORRIDOR', 'SHELF_LEFT_TOP'] },
+            'SHELF_LEFT_TOP': { x: 2.2, y: 3.5, neighbors: ['HALL_LEFT', 'SHELF_LEFT_MID'], isShelf: true },
+            'SHELF_LEFT_MID': { x: 2.2, y: 6.5, neighbors: ['SHELF_LEFT_TOP', 'SHELF_LEFT_BOT'], isShelf: true },
+            'SHELF_LEFT_BOT': { x: 2.2, y: 8.5, neighbors: ['SHELF_LEFT_MID', 'FRONT_CROSSROAD'], isShelf: true },
+            'FRONT_CROSSROAD': { x: 5, y: 9, neighbors: ['SHELF_LEFT_BOT', 'QUEUE_3', 'HALL_RIGHT'] },
+            
+            // Puntos de Fila frente al vendedor
+            'QUEUE_3': { x: 5, y: 7.8, neighbors: ['QUEUE_2', 'FRONT_CROSSROAD'] },
+            'QUEUE_2': { x: 5, y: 6.6, neighbors: ['QUEUE_1', 'QUEUE_3'] },
+            'QUEUE_1': { x: 5, y: 5.2, neighbors: ['QUEUE_2'] }
         };
 
-        // Geometría estática de la tienda
+        // Geometría optimizada para dejar pasillos amplios y realistas
         this.staticObjects = [
-            { x: 1, y: 1, z: 0, w: 0.8, d: 3.5, h: 2.5, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
-            { x: 1, y: 5, z: 0, w: 0.8, d: 3.5, h: 2.5, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
-            { x: 3, y: 3, z: 0, w: 0.8, d: 4.5, h: 2.5, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
-            { x: 6, y: 1, z: 0, w: 4, d: 0.8, h: 3.0, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
-            { x: 10, y: 3, z: 0, w: 1.2, d: 2.5, h: 3, type: 'block', top: "#a5d5f2", left: "#8ecaed", right: "#63a4c4" },
-            { x: 10, y: 7, z: 0, w: 1.2, d: 1.5, h: 2.8, type: 'block', top: "#7209b7", left: "#560bad", right: "#3a0ca3" },
-            { x: 4, y: 4.5, z: 0, w: 2.5, d: 0.8, h: 1.5, type: 'block', top: "#fc9f38", left: "#fb8500", right: "#c26600" }
+            // Estantes lado izquierdo (Reorganizados con espacio central)
+            { x: 0.8, y: 1.5, z: 0, w: 0.8, d: 3.0, h: 2.2, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            { x: 0.8, y: 5.5, z: 0, w: 0.8, d: 3.0, h: 2.2, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            // Estante central
+            { x: 3.8, y: 3.0, z: 0, w: 0.8, d: 4.0, h: 2.2, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            // Estante de pared al fondo
+            { x: 6.5, y: 0.8, z: 0, w: 3.5, d: 0.8, h: 2.5, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            // Vitrina / Heladera (Fondo derecha)
+            { x: 10.2, y: 2.5, z: 0, w: 1.0, d: 2.0, h: 2.4, type: 'block', top: "#a5d5f2", left: "#8ecaed", right: "#63a4c4" },
+            // Maquina Arcade / Snacks
+            { x: 10.2, y: 7.5, z: 0, w: 1.0, d: 1.5, h: 2.2, type: 'block', top: "#7209b7", left: "#560bad", right: "#3a0ca3" },
+            // Mostrador Principal (Ajustado en altura h:1.0 para que se vea claro el vendedor)
+            { x: 4.0, y: 4.2, z: 0, w: 2.0, d: 0.8, h: 1.0, type: 'block', top: "#fc9f38", left: "#fb8500", right: "#c26600" }
         ];
 
         this.offsetX = 0;
@@ -76,7 +85,6 @@ class GameScreen {
     }
 
     setupUI() {
-        // Crear elemento para el marcador de dinero y tiempo global
         this.hudContainer = document.createElement('div');
         this.hudContainer.id = 'game-hud';
         this.hudContainer.style.position = 'absolute';
@@ -109,15 +117,12 @@ class GameScreen {
         this.isGameOver = false;
         this.moneyDisplay.innerText = `$${this.scoreMoney}`;
 
-        // Iniciar al menos el aforo mínimo
         for (let i = 0; i < this.minCustomers; i++) {
             setTimeout(() => this.spawnCustomer(), i * 1500);
         }
 
-        // Bucle de flujo continuo de nuevos clientes
         this.scheduleNextCustomerSpawn();
 
-        // Cronómetro global
         clearInterval(this.gameTimerInterval);
         this.gameTimerInterval = setInterval(() => {
             this.gameDuration--;
@@ -134,7 +139,7 @@ class GameScreen {
     scheduleNextCustomerSpawn() {
         if (this.isGameOver) return;
 
-        const nextSpawnTime = Math.random() * 4000 + 3000; // Cada 3 a 7 segundos
+        const nextSpawnTime = Math.random() * 4000 + 3000;
         setTimeout(() => {
             if (this.customers.length < this.maxCustomers) {
                 this.spawnCustomer();
@@ -213,14 +218,16 @@ class GameScreen {
         }
     }
 
-    drawSphere(x, y, z, baseColor, highlightColor) {
+    drawSphere(x, y, z, baseColor, highlightColor, hasDVD = false) {
         const pixel = this.toIso(x, y, z);
         
+        // Sombra
         this.ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
         this.ctx.beginPath();
         this.ctx.ellipse(pixel.x, pixel.y + this.tileSize * 0.2, this.tileSize * 0.35, this.tileSize * 0.18, 0, 0, Math.PI * 2);
         this.ctx.fill();
 
+        // Esfera (Cuerpo NPC)
         this.ctx.beginPath();
         this.ctx.arc(pixel.x, pixel.y, this.tileSize / 1.8, 0, Math.PI * 2);
         this.ctx.fillStyle = baseColor;
@@ -229,10 +236,30 @@ class GameScreen {
         this.ctx.strokeStyle = "#0b132b";
         this.ctx.stroke();
 
+        // Brillo
         this.ctx.beginPath();
         this.ctx.arc(pixel.x - this.tileSize * 0.15, pixel.y - this.tileSize * 0.15, this.tileSize / 4, 0, Math.PI * 2);
         this.ctx.fillStyle = highlightColor;
         this.ctx.fill();
+
+        // Si compró la película, dibujarle la cajita de DVD a un costado
+        if (hasDVD) {
+            const dvdX = pixel.x + this.tileSize * 0.3;
+            const dvdY = pixel.y - this.tileSize * 0.2;
+            const dvdW = this.tileSize * 0.35;
+            const dvdH = this.tileSize * 0.5;
+
+            // Caja de DVD
+            this.ctx.fillStyle = "#e63946";
+            this.ctx.fillRect(dvdX, dvdY, dvdW, dvdH);
+            this.ctx.strokeStyle = "#ffffff";
+            this.ctx.lineWidth = 1;
+            this.ctx.strokeRect(dvdX, dvdY, dvdW, dvdH);
+
+            // Carátula interior
+            this.ctx.fillStyle = "#ffc940";
+            this.ctx.fillRect(dvdX + 2, dvdY + 2, dvdW - 4, dvdH - 4);
+        }
     }
 
     addFloatingText(text, x, y, z, color) {
@@ -276,6 +303,7 @@ class GameScreen {
 
         const renderList = [];
 
+        // Agregar Muebles
         this.staticObjects.forEach(obj => {
             renderList.push({
                 depth: obj.x + obj.y + (obj.w + obj.d) / 2,
@@ -283,15 +311,17 @@ class GameScreen {
             });
         });
 
+        // Agregar VENDEDOR (Naranja bien visible)
         renderList.push({
             depth: this.sellerPos.x + this.sellerPos.y,
-            render: () => this.drawSphere(this.sellerPos.x, this.sellerPos.y, 0.5, "#ffb703", "rgba(255, 255, 255, 0.7)")
+            render: () => this.drawSphere(this.sellerPos.x, this.sellerPos.y, this.sellerPos.z, "#ff7b00", "rgba(255, 255, 255, 0.8)")
         });
 
+        // Agregar Clientes
         this.customers.forEach(c => {
             renderList.push({
                 depth: c.pos.x + c.pos.y,
-                render: () => this.drawSphere(c.pos.x, c.pos.y, 0.5, c.color, "rgba(255, 255, 255, 0.6)")
+                render: () => this.drawSphere(c.pos.x, c.pos.y, 0.5, c.color, "rgba(255, 255, 255, 0.6)", c.hasDVD)
             });
         });
 
@@ -305,7 +335,12 @@ class GameScreen {
         if (typeof DB === 'undefined' || !DB.customers || this.isGameOver) return;
 
         const randomData = DB.customers[Math.floor(Math.random() * DB.customers.length)];
-        const colors = ["#ffffff", "#e0e1dd", "#48cae4", "#90e0ef", "#f72585"];
+        
+        // Paleta variada de colores vibrantes para cada NPC
+        const colors = [
+            "#3a86ff", "#8338ec", "#ff006e", "#fb5607", "#ff0054", 
+            "#00f5d4", "#7b2cbf", "#00b4d8", "#06d6a0", "#ffb703"
+        ];
         
         const newCustomer = {
             id: Math.random(),
@@ -314,20 +349,20 @@ class GameScreen {
             path: [],
             pos: { x: this.nodes['ENTRANCE'].x, y: this.nodes['ENTRANCE'].y },
             state: 'BROWSING',
-            browseCount: Math.floor(Math.random() * 3) + 2, // Entre 2 y 4 paradas aleatorias
-            color: colors[Math.floor(Math.random() * colors.length)]
+            browseCount: Math.floor(Math.random() * 3) + 2,
+            pauseTimer: 0, // Temporizador para mirar el estante
+            color: colors[Math.floor(Math.random() * colors.length)],
+            hasDVD: false
         };
 
         this.setRandomBrowseStep(newCustomer);
         this.customers.push(newCustomer);
     }
 
-    // Elige un vecino completamente al azar de la red de nodos
     setRandomBrowseStep(customer) {
         const currentNode = this.nodes[customer.currentNodeKey];
         const randomNeighbor = currentNode.neighbors[Math.floor(Math.random() * currentNode.neighbors.length)];
         
-        // Evitar que entren a la zona de fila durante la exploración libre
         if (['QUEUE_1', 'QUEUE_2', 'QUEUE_3'].includes(randomNeighbor)) {
             customer.path = [customer.currentNodeKey];
         } else {
@@ -359,6 +394,12 @@ class GameScreen {
         const speed = 0.045;
 
         this.customers.forEach(c => {
+            // Si está pausado observando un estante
+            if (c.pauseTimer > 0) {
+                c.pauseTimer--;
+                return;
+            }
+
             if (c.path.length > 0) {
                 const nextNodeKey = c.path[0];
                 const targetPos = this.nodes[nextNodeKey];
@@ -387,7 +428,14 @@ class GameScreen {
     }
 
     handleNodeReached(c) {
+        const currentNodeObj = this.nodes[c.currentNodeKey];
+
         if (c.state === 'BROWSING') {
+            // Si el nodo actual es de un estante, pausar para dar sensación de elegir película
+            if (currentNodeObj && currentNodeObj.isShelf) {
+                c.pauseTimer = Math.floor(Math.random() * 80) + 60; // Pausa de 1 a 2.5 segundos (60-140 frames)
+            }
+
             c.browseCount--;
             if (c.browseCount > 0) {
                 this.setRandomBrowseStep(c);
@@ -397,7 +445,6 @@ class GameScreen {
             }
         } else if (c.state === 'LEAVING') {
             this.customers = this.customers.filter(item => item.id !== c.id);
-            // Garantizar aforo mínimo si bajamos de minCustomers
             if (this.customers.length < this.minCustomers && !this.isGameOver) {
                 setTimeout(() => this.spawnCustomer(), 1000);
             }
@@ -494,16 +541,18 @@ class GameScreen {
         this.optionsContainer.classList.add('hidden');
 
         if (success) {
-            // Recompensa calculada según rapidez (Máximo $200, Mínimo $50)
             const earned = 50 + (this.timeLeft * 7.5);
             this.scoreMoney += Math.round(earned);
             this.moneyDisplay.innerText = `$${this.scoreMoney}`;
 
-            // Texto flotante de dinero en verde
+            // Asignar que el cliente lleva su caja de DVD
+            if (this.currentCustomer) {
+                this.currentCustomer.hasDVD = true;
+            }
+
             this.addFloatingText(`+$${Math.round(earned)}`, this.currentCustomer.pos.x, this.currentCustomer.pos.y, 1.2, '#4ef037');
             this.npcText.innerHTML = "¡Exacto! Esto es justo lo que buscaba. ¡Gracias!";
         } else {
-            // Texto flotante de fallo en rojo
             this.addFloatingText(`¡Sin Venta!`, this.currentCustomer.pos.x, this.currentCustomer.pos.y, 1.2, '#ff3333');
             this.npcText.innerHTML = "Mmm... no estoy seguro de que esto sea lo que pedí. Me voy a otro videoclub.";
         }
