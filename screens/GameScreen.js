@@ -7,67 +7,67 @@ class GameScreen {
         this.npcText = document.getElementById('npc-text');
         this.optionsContainer = document.getElementById('options-container');
 
-        // Sistema de partida y dinero
+        // Sistema de dinero y tiempo global
         this.scoreMoney = 0;
         this.gameDuration = 120;
         this.gameTimerInterval = null;
         this.isGameOver = false;
 
-        // Temporizador de diálogo individual
+        // Temporizador de diálogo
         this.timeLeft = 20;
         this.timerInterval = null;
         this.currentCustomer = null;
 
-        // Textos flotantes (+$$$)
         this.floatingTexts = [];
 
         this.mapSizeX = 12;
         this.mapSizeY = 12;
 
-        // Vendedor (Detrás del mostrador x:5, y:3.8, z:0.6)
-        this.sellerPos = { x: 5, y: 3.8, z: 0.6 };
+        // Posición ajustada del Video Club Owner (detrás del mostrador)
+        this.sellerPos = { x: 4.5, y: 3.8, z: 0.35 };
 
         this.customers = [];
         this.minCustomers = 2;
         this.maxCustomers = 5;
 
-        // Red ampliada de nodos para navegación realista
+        // Geometría del local
+        this.staticObjects = [
+            // Estantes lado izquierdo
+            { id: 'shelf_left_1', x: 0.8, y: 1.5, z: 0, w: 0.8, d: 3.0, h: 2.0, top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            { id: 'shelf_left_2', x: 0.8, y: 5.5, z: 0, w: 0.8, d: 3.0, h: 2.0, top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            // Estante central principal
+            { id: 'shelf_mid', x: 4.5, y: 0.8, z: 0, w: 0.8, d: 2.2, h: 2.0, top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            // Estante fondo pared
+            { id: 'shelf_back', x: 7.0, y: 0.8, z: 0, w: 3.0, d: 0.8, h: 2.2, top: "#ffc940", left: "#ffb703", right: "#cc9202" },
+            // Cooler / Heladera
+            { id: 'cooler', x: 10.2, y: 2.5, z: 0, w: 1.0, d: 2.0, h: 2.2, top: "#a5d5f2", left: "#8ecaed", right: "#63a4c4" },
+            // Arcade
+            { id: 'arcade', x: 10.2, y: 7.5, z: 0, w: 1.0, d: 1.5, h: 2.0, top: "#7209b7", left: "#560bad", right: "#3a0ca3" },
+            // Mostrador Principal del Vendedor
+            { id: 'counter', x: 3.5, y: 4.2, z: 0, w: 2.2, d: 0.8, h: 1.1, top: "#fc9f38", left: "#fb8500", right: "#c26600" }
+        ];
+
+        // Red de nodos en los pasillos libres
         this.nodes = {
             'ENTRANCE': { x: 11, y: 11, neighbors: ['HALL_RIGHT'] },
-            'HALL_RIGHT': { x: 11, y: 7, neighbors: ['ENTRANCE', 'SHELF_ARCADE', 'HALL_TOP_RIGHT', 'FRONT_CROSSROAD'] },
+            'HALL_RIGHT': { x: 11, y: 5.5, neighbors: ['ENTRANCE', 'SHELF_ARCADE', 'HALL_TOP_RIGHT', 'FRONT_CROSSROAD'] },
             'SHELF_ARCADE': { x: 11, y: 9, neighbors: ['HALL_RIGHT'], isShelf: true },
-            'HALL_TOP_RIGHT': { x: 11, y: 2, neighbors: ['HALL_RIGHT', 'TOP_BACK_CORRIDOR', 'SHELF_COOLER'] },
-            'SHELF_COOLER': { x: 9.2, y: 2, neighbors: ['HALL_TOP_RIGHT'], isShelf: true },
-            'TOP_BACK_CORRIDOR': { x: 6, y: 2, neighbors: ['HALL_TOP_RIGHT', 'SHELF_BACK_WALL', 'HALL_LEFT'] },
-            'SHELF_BACK_WALL': { x: 7.5, y: 2, neighbors: ['TOP_BACK_CORRIDOR'], isShelf: true },
-            'HALL_LEFT': { x: 2.2, y: 2, neighbors: ['TOP_BACK_CORRIDOR', 'SHELF_LEFT_TOP'] },
-            'SHELF_LEFT_TOP': { x: 2.2, y: 3.5, neighbors: ['HALL_LEFT', 'SHELF_LEFT_MID'], isShelf: true },
-            'SHELF_LEFT_MID': { x: 2.2, y: 6.5, neighbors: ['SHELF_LEFT_TOP', 'SHELF_LEFT_BOT'], isShelf: true },
-            'SHELF_LEFT_BOT': { x: 2.2, y: 8.5, neighbors: ['SHELF_LEFT_MID', 'FRONT_CROSSROAD'], isShelf: true },
-            'FRONT_CROSSROAD': { x: 5, y: 9, neighbors: ['SHELF_LEFT_BOT', 'QUEUE_3', 'HALL_RIGHT'] },
+            'HALL_TOP_RIGHT': { x: 11, y: 1.5, neighbors: ['HALL_RIGHT', 'SHELF_COOLER', 'PASSED_BACK'] },
+            'SHELF_COOLER': { x: 9.0, y: 2.5, neighbors: ['HALL_TOP_RIGHT'], isShelf: true },
+            'PASSED_BACK': { x: 6.0, y: 1.5, neighbors: ['HALL_TOP_RIGHT', 'SHELF_BACK', 'PASSED_MID'] },
+            'SHELF_BACK': { x: 7.5, y: 2.0, neighbors: ['PASSED_BACK'], isShelf: true },
+            'PASSED_MID': { x: 2.5, y: 1.5, neighbors: ['PASSED_BACK', 'PASSED_LEFT_TOP'] },
+            'PASSED_LEFT_TOP': { x: 2.5, y: 3.5, neighbors: ['PASSED_MID', 'SHELF_LEFT_1', 'PASSED_LEFT_MID'] },
+            'SHELF_LEFT_1': { x: 2.2, y: 2.8, neighbors: ['PASSED_LEFT_TOP'], isShelf: true },
+            'PASSED_LEFT_MID': { x: 2.5, y: 7.0, neighbors: ['PASSED_LEFT_TOP', 'SHELF_LEFT_2', 'FRONT_CROSSROAD'] },
+            'SHELF_LEFT_2': { x: 2.2, y: 6.5, neighbors: ['PASSED_LEFT_MID'], isShelf: true },
+            'FRONT_CROSSROAD': { x: 5.0, y: 9.0, neighbors: ['PASSED_LEFT_MID', 'HALL_RIGHT', 'QUEUE_3'] },
             
-            // Puntos de Fila frente al vendedor
-            'QUEUE_3': { x: 5, y: 7.8, neighbors: ['QUEUE_2', 'FRONT_CROSSROAD'] },
-            'QUEUE_2': { x: 5, y: 6.6, neighbors: ['QUEUE_1', 'QUEUE_3'] },
-            'QUEUE_1': { x: 5, y: 5.2, neighbors: ['QUEUE_2'] }
+            // Fila de atención
+            'QUEUE_3': { x: 4.5, y: 7.5, neighbors: ['QUEUE_2', 'FRONT_CROSSROAD'] },
+            'QUEUE_2': { x: 4.5, y: 6.2, neighbors: ['QUEUE_1', 'QUEUE_3'] },
+            'QUEUE_1': { x: 4.5, y: 5.2, neighbors: ['QUEUE_2'] }
         };
-
-        // Geometría optimizada para dejar pasillos amplios y realistas
-        this.staticObjects = [
-            // Estantes lado izquierdo (Reorganizados con espacio central)
-            { x: 0.8, y: 1.5, z: 0, w: 0.8, d: 3.0, h: 2.2, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
-            { x: 0.8, y: 5.5, z: 0, w: 0.8, d: 3.0, h: 2.2, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
-            // Estante central
-            { x: 3.8, y: 3.0, z: 0, w: 0.8, d: 4.0, h: 2.2, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
-            // Estante de pared al fondo
-            { x: 6.5, y: 0.8, z: 0, w: 3.5, d: 0.8, h: 2.5, type: 'block', top: "#ffc940", left: "#ffb703", right: "#cc9202" },
-            // Vitrina / Heladera (Fondo derecha)
-            { x: 10.2, y: 2.5, z: 0, w: 1.0, d: 2.0, h: 2.4, type: 'block', top: "#a5d5f2", left: "#8ecaed", right: "#63a4c4" },
-            // Maquina Arcade / Snacks
-            { x: 10.2, y: 7.5, z: 0, w: 1.0, d: 1.5, h: 2.2, type: 'block', top: "#7209b7", left: "#560bad", right: "#3a0ca3" },
-            // Mostrador Principal (Ajustado en altura h:1.0 para que se vea claro el vendedor)
-            { x: 4.0, y: 4.2, z: 0, w: 2.0, d: 0.8, h: 1.0, type: 'block', top: "#fc9f38", left: "#fb8500", right: "#c26600" }
-        ];
 
         this.offsetX = 0;
         this.offsetY = 0;
@@ -220,46 +220,63 @@ class GameScreen {
 
     drawSphere(x, y, z, baseColor, highlightColor, hasDVD = false) {
         const pixel = this.toIso(x, y, z);
+        const radius = this.tileSize / 1.8;
         
-        // Sombra
+        // Sombra en el suelo
+        const floorPixel = this.toIso(x, y, 0);
         this.ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
         this.ctx.beginPath();
-        this.ctx.ellipse(pixel.x, pixel.y + this.tileSize * 0.2, this.tileSize * 0.35, this.tileSize * 0.18, 0, 0, Math.PI * 2);
+        this.ctx.ellipse(floorPixel.x, floorPixel.y + this.tileSize * 0.1, this.tileSize * 0.35, this.tileSize * 0.18, 0, 0, Math.PI * 2);
         this.ctx.fill();
 
         // Esfera (Cuerpo NPC)
         this.ctx.beginPath();
-        this.ctx.arc(pixel.x, pixel.y, this.tileSize / 1.8, 0, Math.PI * 2);
+        this.ctx.arc(pixel.x, pixel.y, radius, 0, Math.PI * 2);
         this.ctx.fillStyle = baseColor;
         this.ctx.fill();
         this.ctx.lineWidth = 1.5;
         this.ctx.strokeStyle = "#0b132b";
         this.ctx.stroke();
 
-        // Brillo
+        // Brillo 3D
         this.ctx.beginPath();
         this.ctx.arc(pixel.x - this.tileSize * 0.15, pixel.y - this.tileSize * 0.15, this.tileSize / 4, 0, Math.PI * 2);
         this.ctx.fillStyle = highlightColor;
         this.ctx.fill();
 
-        // Si compró la película, dibujarle la cajita de DVD a un costado
+        // Si lleva estuche de DVD
         if (hasDVD) {
-            const dvdX = pixel.x + this.tileSize * 0.3;
-            const dvdY = pixel.y - this.tileSize * 0.2;
-            const dvdW = this.tileSize * 0.35;
-            const dvdH = this.tileSize * 0.5;
+            const dvdX = pixel.x + this.tileSize * 0.25;
+            const dvdY = pixel.y - this.tileSize * 0.1;
+            const dvdW = this.tileSize * 0.3;
+            const dvdH = this.tileSize * 0.45;
 
-            // Caja de DVD
             this.ctx.fillStyle = "#e63946";
             this.ctx.fillRect(dvdX, dvdY, dvdW, dvdH);
             this.ctx.strokeStyle = "#ffffff";
             this.ctx.lineWidth = 1;
             this.ctx.strokeRect(dvdX, dvdY, dvdW, dvdH);
 
-            // Carátula interior
             this.ctx.fillStyle = "#ffc940";
             this.ctx.fillRect(dvdX + 2, dvdY + 2, dvdW - 4, dvdH - 4);
         }
+    }
+
+    drawOwnerBehindCounter() {
+        const counter = this.staticObjects.find(o => o.id === 'counter');
+        const counterTopPoint = this.toIso(counter.x, counter.y + counter.d, counter.h);
+        
+        this.ctx.save();
+        
+        // Creamos una máscara de recorte (clip) que tapa el 40% inferior del dueño justo en el borde superior del mostrador
+        this.ctx.beginPath();
+        this.ctx.rect(0, 0, this.canvas.width, counterTopPoint.y);
+        this.ctx.clip();
+
+        // Renderizamos la esfera del dueño (mostrando sólo el 60% superior)
+        this.drawSphere(this.sellerPos.x, this.sellerPos.y, this.sellerPos.z, "#ff7b00", "rgba(255, 255, 255, 0.8)");
+        
+        this.ctx.restore();
     }
 
     addFloatingText(text, x, y, z, color) {
@@ -303,29 +320,34 @@ class GameScreen {
 
         const renderList = [];
 
-        // Agregar Muebles
+        // Muebles (excepto el mostrador que se gestiona de forma especial con el dueño)
         this.staticObjects.forEach(obj => {
+            const frontDepth = (obj.x + obj.w) + (obj.y + obj.d);
             renderList.push({
-                depth: obj.x + obj.y + (obj.w + obj.d) / 2,
+                depth: frontDepth,
                 render: () => this.drawBlock(obj)
             });
         });
 
-        // Agregar VENDEDOR (Naranja bien visible)
+        // Renderizar dueño (atrás del mostrador con el 60% visible)
+        const sellerDepth = this.sellerPos.x + this.sellerPos.y;
         renderList.push({
-            depth: this.sellerPos.x + this.sellerPos.y,
-            render: () => this.drawSphere(this.sellerPos.x, this.sellerPos.y, this.sellerPos.z, "#ff7b00", "rgba(255, 255, 255, 0.8)")
+            depth: sellerDepth,
+            render: () => this.drawOwnerBehindCounter()
         });
 
-        // Agregar Clientes
+        // NPC Clientes
         this.customers.forEach(c => {
+            const customerDepth = c.pos.x + c.pos.y;
             renderList.push({
-                depth: c.pos.x + c.pos.y,
-                render: () => this.drawSphere(c.pos.x, c.pos.y, 0.5, c.color, "rgba(255, 255, 255, 0.6)", c.hasDVD)
+                depth: customerDepth,
+                render: () => this.drawSphere(c.pos.x, c.pos.y, 0.4, c.color, "rgba(255, 255, 255, 0.6)", c.hasDVD)
             });
         });
 
+        // Ordenamiento por profundidad isométrica
         renderList.sort((a, b) => a.depth - b.depth);
+
         renderList.forEach(item => item.render());
 
         this.renderFloatingTexts();
@@ -336,7 +358,6 @@ class GameScreen {
 
         const randomData = DB.customers[Math.floor(Math.random() * DB.customers.length)];
         
-        // Paleta variada de colores vibrantes para cada NPC
         const colors = [
             "#3a86ff", "#8338ec", "#ff006e", "#fb5607", "#ff0054", 
             "#00f5d4", "#7b2cbf", "#00b4d8", "#06d6a0", "#ffb703"
@@ -350,7 +371,7 @@ class GameScreen {
             pos: { x: this.nodes['ENTRANCE'].x, y: this.nodes['ENTRANCE'].y },
             state: 'BROWSING',
             browseCount: Math.floor(Math.random() * 3) + 2,
-            pauseTimer: 0, // Temporizador para mirar el estante
+            pauseTimer: 0,
             color: colors[Math.floor(Math.random() * colors.length)],
             hasDVD: false
         };
@@ -394,7 +415,6 @@ class GameScreen {
         const speed = 0.045;
 
         this.customers.forEach(c => {
-            // Si está pausado observando un estante
             if (c.pauseTimer > 0) {
                 c.pauseTimer--;
                 return;
@@ -431,9 +451,8 @@ class GameScreen {
         const currentNodeObj = this.nodes[c.currentNodeKey];
 
         if (c.state === 'BROWSING') {
-            // Si el nodo actual es de un estante, pausar para dar sensación de elegir película
             if (currentNodeObj && currentNodeObj.isShelf) {
-                c.pauseTimer = Math.floor(Math.random() * 80) + 60; // Pausa de 1 a 2.5 segundos (60-140 frames)
+                c.pauseTimer = Math.floor(Math.random() * 80) + 60;
             }
 
             c.browseCount--;
@@ -545,7 +564,6 @@ class GameScreen {
             this.scoreMoney += Math.round(earned);
             this.moneyDisplay.innerText = `$${this.scoreMoney}`;
 
-            // Asignar que el cliente lleva su caja de DVD
             if (this.currentCustomer) {
                 this.currentCustomer.hasDVD = true;
             }
